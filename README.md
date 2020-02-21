@@ -1,5 +1,4 @@
-# cp
-Utilities for accessing the crashportal
+# crashportal uitlities
 
 These scripts allow to download a single crashreport or a set of crashreports from crashportal
 
