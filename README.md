@@ -30,7 +30,7 @@ Bonus
 
 Analyze logs in a folder with one report or few reports:
 
-    an-logs                          # analyze reports in the current dir and write to ../result-DIRNAME.txt
+    an-logs                          # analyze reports in the current folder and write to ../result-DIRNAME.txt
     an-logs cp/1234567890            # analyze report in the folder ./cp/1234567890 and write to ./cp/result-1234567890.txt
 
 
