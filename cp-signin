@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# This file has to be sourced because it modifies the environment
+
+. cp-setenv
+
+# Check the current JSESSIONID if $1 is empty
+if [ -n "$JSESSIONID" -a -z "$JSESSIONOK" ]; then
+    pre "Test JSESSIONID: '$JSESSIONID'..."
+    TEST=$(wget "$CPURL/dashboard/distinctAjax?field=deviceModel" --no-check-certificate -qO- --header "Cookie: JSESSIONID=$JSESSIONID")
+    if [ $? -ne 0 ]; then
+        echo " Failed" && err "Failed to test JSESSIONID" && exit 70
+    elif [ -z "$TEST" ]; then
+        echo " Expired" && wrn "Forget old JSESSIONID"
+        unset JSESSIONID
+    else
+        echo " OK"
+    fi
+fi
+
+# Request for the new JSESSIONID
+if [ -z "$JSESSIONID" ]; then
+    pre "Get new JSESSIONID..."
+    export JSESSIONID=$($CPDIR/cp-session)
+    [ -z "$JSESSIONID" ] && echo " Failed" && err "Failed to login" && exit 70
+    echo " OK" && wrn "New JSESSIONID: $JSESSIONID"
+fi

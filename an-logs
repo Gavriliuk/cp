@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# $1 - folder to analyze (OPTIONAL)
+[ -z "$1" ] || cd $1 || exit
+folder=$(basename $(readlink -m .))
+cd .. || exit
+
+stb_tmpl=" agnostic\|SIG\|^restart\|RECEIVER_START_TIME\|maxMessageLength\|Registering\|destroyPlugin\|createPlugin\destroyPluginRMF PLUGIN LOADED\|getPreviousRebootInfo\|crashed\|CRASHED\|playpump\|GLib-CRITICAL\|displaysettings\|addInbandFilterFunc\|watermark\|loadPlugin\|is unresponsive\|is recovered\|recovered after\|hang detected\|HangDetector\|detector\|average\|CURL error\|core dumped\|\*\*\* Error\|killing\|killed by\|SignalHandler\|emory pressure\|Too many open files\|underflow\|\[Main\]\|XREKeyPressLog.*8000 received"
+[ -n "$2" ] && stb_tmpl="$2"
+
+
+print_double_line()
+{
+echo '================================================================================'
+}
+
+print_single_line()
+{
+echo '--------------------------------------------------------------------------------'
+}
+
+# $1 - STB log (any part) file name (.../receiver.log, .../receiver.log.1 etc.)
+read_stb_log()
+{
+test -f $1 || return
+>&2 echo $1
+print_double_line
+echo $1
+print_single_line
+grep "$stb_tmpl" $1
+}
+
+# $1 - STB log (last part) file name (.../receiver.log)
+read_stb_logs()
+{
+for f in $(ls $1.?? 2> /dev/null|sort -r && ls -1 $1.? 2> /dev/null|sort -r && ls -1 $1 2> /dev/null); do
+    read_stb_log $f
+done
+}
+
+# $1 - minidump report file name
+# $2 - signature (OPTIONAL)
+read_md_report()
+{
+local thread=$(head $1 -n 5|grep '^Crash'|cut -d '|' -f 4)
+if [ -n "$thread" ]; then
+    print_double_line
+    if [ -n "$2" ]; then
+        grep "^$thread|" $1 | grep "|$2|" -B 10 -A 5
+    else
+        grep "^$thread|" $1 | head -n 10
+    fi
+fi
+if grep -q 'breakpad' $1; then
+    print_single_line
+    grep 'breakpad' $1 -B 1 -A 1
+fi
+}
+
+# $1 - core log file name (.../core_log.txt)
+read_core_log()
+{
+test -f $1 || return
+>&2 echo $1
+local dir=${1%/core_log.txt}
+local sign=''
+if [ -f $dir/report.html ]; then
+    print_double_line
+    echo 'ID:     ' $(grep -A 4 '<td class="name">ID</td>' $dir/report.html | grep '<td class="value">' | cut -d '>' -f 2 | cut -d '<' -f 1)
+    echo 'Crashed:' $(grep -A 4 '<td class="name">Date Crashed</td>' $dir/report.html | grep '<td class="value">' | cut -d '>' -f 2 | cut -d 'U' -f 1)
+    echo 'Reason: ' $(grep -A 5 '<td class="name">Crash Reason</td>' $dir/report.html | grep '<a href' | cut -d '>' -f 2 | cut -d '<' -f 1)
+    echo 'App:    ' $(grep -A 5 '<td class="name">App</td>' $dir/report.html | grep -v '<.*>')
+    echo 'Signat.:' $(grep -A 5 '<td class="name">Signature</td>' $dir/report.html | grep -v '<.*>')
+    echo 'Built:  ' $(grep -A 4 '<td class="name">Date Built</td>' $dir/report.html | grep '<td class="value">' | cut -d '>' -f 2 | cut -d 'U' -f 1)
+    echo 'Version:' $(grep -A 5 '<td class="name">Version</td>' $dir/report.html | grep -v '<.*>')
+    sign=$(grep -A 5 '<td class="name">Signature</td>' $dir/report.html | grep -v '<.*>')
+fi
+if [ -f $dir/report.txt ]; then
+    read_md_report $dir/report.txt $sign | sed -e 's/|\/usr\/.*-r0\//|/g' -e 's/|\/mnt\/.*-gnueabi\//|/g' -e 's/|\/mnt\/.*\/usr\//|usr\//g' -e 's/\/[^\/]*-r0\//\//g'
+fi
+print_double_line
+echo $1
+print_single_line
+grep "starting\|average\|successful\|uploading\|working" $1
+print_single_line
+grep "^Mem:" -A 2 -B 2 $1
+if [ -f "$dir/receiver.log" ]; then
+    read_stb_logs $dir/receiver.log
+elif [ -f "$dir/-receiver.log" ]; then
+    read_stb_log $dir/-receiver.log
+fi
+echo '--------------------------------------------------------------------------------'
+echo
+echo
+>&2 echo
+}
+
+read_core_logs()
+{
+for f in $(find $folder -name core_log.txt|sort -nr); do
+    read_core_log $f
+done
+}
+
+read_core_logs > result-$folder.txt

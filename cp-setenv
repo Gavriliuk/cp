@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# This file has to be sourced because it modifies the environment
+
+export CPDBG=1
+
+if [ -z "$CPURL" ]; then
+    export CPURL='https://crashportal.stb.r53.xcal.tv'
+    >&2 echo "CPURL: $CPURL"
+fi
+
+if [ -z "$CPDIR" ]; then
+    export CPDIR=$(dirname $BASH_SOURCE)
+    >&2 echo "CPDIR: $CPDIR"
+fi
+
+if ! (set | grep -q '^log ()'); then
+    >&2 echo -n "Define log functions... "
+    . $CPDIR/cp-text
+    >&2 echo "OK"
+fi

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# This file has to be sourced because it modifies the environment
+
+export RED=`tput setaf 1`
+export GRN=`tput setaf 2`
+export NOC=`tput sgr0`
+
+log() { echo $(date +%H:%M:%S) $@; }
+pre() { echo -n $(date +%H:%M:%S) $@; }
+wrn() { log $GRN"WARNING: $@ $NOC"; }
+err() { log $RED"ERROR: $@ $NOC"; }
+
+export -f log
+export -f pre
+export -f wrn
+export -f err

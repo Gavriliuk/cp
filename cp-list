@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Setup specific environment
+. cp-setenv
+
+# One-pass loop (for using "break" instead of "exit")
+while :; do
+
+log "Start $BASH_SOURCE $@"
+
+# Check the 1st argument (optional, string, the part of URL after '?')
+FILTER=$1
+[ -z "$FILTER" ] && wrn "List filter is empty"
+[ -n "$CPDBG" ] && wrn "FILTER: '$FILTER'"
+
+# Check the 2nd argument (optional, string, the path for downloading reports, "/$REPID" will be appended)
+LISTDIR=$2
+[ -z "$LISTDIR" ] && LISTDIR="cp"
+[ -n "$CPDBG" ] && wrn "LISTDIR: '$LISTDIR'"
+
+[ -z "$JSESSIONID" ] && . $CPDIR/cp-signin
+[ -z "$JSESSIONID" ] && err "Failed to connect" && break
+
+LISTURL="$CPURL/minidumpReport/list?$FILTER"
+log $LISTURL
+LISTFILE=$(mktemp ${3}list-XXX.html)
+[ -z "$LISTFILE" ] && break
+[ -n "$CPDBG" ] && wrn "LISTFILE: $LISTFILE"
+
+LIST_TRYCOUNT=5
+while :; do
+    if [ -n "$JSESSIONID" ]; then
+        [ -n "$CPDBG" ] && log "wget --no-check-certificate -qO $LISTFILE --header \"Cookie: JSESSIONID=$JSESSIONID\" -- \"$LISTURL\""
+        wget --no-check-certificate -qO $LISTFILE --header "Cookie: JSESSIONID=$JSESSIONID" -- "$LISTURL"
+        [ -f $LISTFILE ] && [ $(stat -c '%s' $LISTFILE) -gt 0 ] && break
+        [ -n "$CPDBG" ] && wrn "FILESIZE: $(stat -c '%s' $LISTFILE)"
+    fi
+    (( LIST_TRYCOUNT-- == 0 )) && err "Failed to load list" && break
+    . $CPDIR/cp-signin
+done
+[ -f $LISTFILE -a $(stat -c '%s' $LISTFILE) -gt 0 ] || break
+
+LIST=$(grep "/minidumpReport/show" $LISTFILE|cut -d '/' -f 4|cut -d '?' -f 1)
+COUNT=$(echo $LIST|wc -w) && [ $COUNT -eq 1 ] && log "Found 1 report" || log "Found $COUNT reports"
+INDEX=0
+for REPID in $LIST; do
+    pre "Report #$(( ++INDEX )) $REPID:"; echo -n ' '
+    . $CPDIR/cp-rep $REPID $LISTDIR
+done
+
+#[ -z "$CPDBG" ] && rm $LISTFILE
+
+# End of the one-pass loop
+break; done

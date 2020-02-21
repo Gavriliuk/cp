@@ -1,0 +1,75 @@
+#!/bin/bash
+
+. cp-setenv
+
+# One-pass loop (for using "break" instead of "exit")
+while :; do
+
+# Check the 1st argument (mandatory, number, the Id of report to download)
+REPID=$1
+[ -z "$REPID" ] && err "Report id is not specified" && break
+
+# Check the 2nd argument (optional, string, the path for downloading reports, "/$REPID" will be appended)
+REPBASEDIR=$2 && [ -z "$REPBASEDIR" ] && REPBASEDIR="cp"
+REPDIR="$REPBASEDIR/$REPID"
+
+# Check JSESSIONID
+[ -z "$JSESSIONID" ] && . $CPDIR/cp-signin
+[ -z "$JSESSIONID" ] && err "Failed to connect" && break
+
+! mkdir -p $REPDIR && ec=$? && err "Failed to create dir '$REPDIR'" && break
+REPDIR=$(readlink -m "$REPDIR")
+
+REPURL="$CPURL/minidumpReport/show/$REPID"
+REPFILE=$REPDIR/report.html
+
+REP_TRYCOUNT=5
+while :; do
+    if [ -n "$JSESSIONID" ]; then
+        wget --no-check-certificate -qO $REPFILE --header "Cookie: JSESSIONID=$JSESSIONID" -- $REPURL
+        [ -f $REPFILE -a $(stat -c '%s' $REPFILE) -gt 0 ] && break
+    fi
+    (( REP_TRYCOUNT-- == 0 )) && err "Failed to load show $REPID" && break
+    . $CPDIR/cp-signin
+done
+[ -f $REPFILE -a $(stat -c '%s' $REPFILE) -gt 0 ] || break
+
+TGZURL=$(grep -o '<a href=".*\.dmp\.tgz">' $REPFILE | grep -o 'https.*.*\.dmp\.tgz')
+[ -z "$TGZURL" ] && err "No tgz $REPID" && rm -rf $REPDIR && break
+TGZFILE=$REPDIR/report.tgz
+! wget --no-check-certificate -qO $TGZFILE -- $TGZURL && err "Failed to load tgz $REPID" && break
+
+RAWURL=$(grep -o '<a href=".*\.dmp\.tgz\.txt">' $REPFILE | grep -o 'https.*.*\.dmp\.tgz\.txt')
+[ -z "$RAWURL" ] && err "No raw $REPID" && rm -rf $REPDIR && break
+RAWFILE=$REPDIR/report.txt
+! wget --no-check-certificate -qO $RAWFILE -- $RAWURL && err "Failed to load raw $REPID" && break
+
+TGZDIR=$REPDIR/tgz
+! mkdir -p $TGZDIR && ec=$? && err "Failed to create dir '$TGZDIR'" && break
+! tar zxf $TGZFILE -C $TGZDIR && ec=$? && err "Failed to extract tgz '$TGZFILE'" && break
+
+cd $TGZDIR
+
+[ -f version.txt ] && mv version.txt ..
+[ -f *receiver.log ] && mv *receiver.log ../-receiver.log
+[ -f *messages.txt ] && mv *messages.txt ../-messages.txt
+[ -f *ocapri_log.txt ] && mv *ocapri_log.txt ../-ocapri_log.txt
+[ -f *applications.log ] && mv *applications.log ../-applications.log
+[ -f opt/logs/crashed_url.txt ] && mv opt/logs/crashed_url.txt ..
+[ -f opt/logs/core_log.txt ] && mv opt/logs/core_log.txt ..
+[ -f opt/logs/receiver.log ] && mv opt/logs/receiver.log* ..
+[ -f opt/logs/thread.log ] && mv opt/logs/thread.log ..
+
+[ -d opt/logs ] && ! [ -e opt/logs/* ] && rmdir opt/logs
+[ -d opt ] && ! [ -e opt/* ] && rmdir opt
+
+[ -f *.dmp ] && rm *.dmp
+
+cd -> /dev/null
+
+[ -d $TGZDIR ] && ! [ -e $TGZDIR/* ] && rmdir $TGZDIR
+
+log "Report is stored to $REPDIR"
+
+# End of the one-pass loop
+break; done
