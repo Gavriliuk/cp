@@ -1,10 +1,11 @@
-# crashportal uitlities
+# crashportal utilities
 
 These scripts allow to download a single crashreport or a set of crashreports from crashportal
 
 
 Installation
     place all these files to any folder listed in $PATH
+    add the line 'machine crashportal login YOURLOGIN password YOURPASSWORD' to your ~/.netrc
 
 
 Usage
