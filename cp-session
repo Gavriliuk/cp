@@ -3,6 +3,6 @@
 . cp-setenv
 
 declare -a tab
-read -r -a tab <<< "$(grep 'gerrit' ~/.netrc)"
+read -r -a tab <<< "$(grep 'crashportal' ~/.netrc)"
 URL="$CPURL/login/login?username=${tab[3]}&password=${tab[5]}"
 wget "$URL" --no-check-certificate -SqO /dev/null 2>&1 | grep 'JSESSIONID' | cut -d '=' -f 2 | cut -d ';' -f 1
