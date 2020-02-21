@@ -34,4 +34,4 @@ Analyze logs in a folder with one report or few reports:
     an-logs cp/1234567890            # analyze report in the folder ./cp/1234567890 and write to ./cp/result-1234567890.txt
 
 
-Enoy!
+Enjoy!
